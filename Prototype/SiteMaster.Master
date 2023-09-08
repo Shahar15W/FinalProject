@@ -1,0 +1,56 @@
+﻿<%@ Master Language="C#" AutoEventWireup="true" CodeBehind="SiteMaster.master.cs" Inherits="Prototype.SiteMaster" %>
+
+<!DOCTYPE html>
+
+<html>
+<head runat="server">
+        <link href="../Styling.css" rel="stylesheet" />
+
+    <title></title>
+    <asp:ContentPlaceHolder ID="head" runat="server">
+    </asp:ContentPlaceHolder>
+</head>
+<body>
+    <nav>
+        <ul>
+          <% if (Session["username"] != null)
+                                {
+                                    Response.Write("<li><a href=\"Home.aspx\">Home</a></li>");
+                                    Response.Write("<li><a href=\"Game.aspx\">Games</a></li>");
+                                    Response.Write("<li><a href=\"Logout.aspx\">Logout</a></li>");
+                                    if ((int)Session["AccessKey"] <= 2)
+                                        Response.Write("<li><a href=\"Admin.aspx\">Update Info</a></li>");
+                                    if((int)Session["AccessKey"] > 2)
+                                        Response.Write("<li><a href=\"Admin.aspx\">Admin</a></li>");
+                                    Response.Write("<li><a class=\"user\">Hello " + Session["fname"] + ", there are currently " + Application["usercount"] + " users online.</a></li>");
+
+
+                                }
+
+                                else
+                                {
+                                    Response.Write("<li><a href=\"Home.aspx\">Home</a></li>");
+                                    Response.Write("<li><a href=\"Game.aspx\">Games</a></li>");
+                                    Response.Write("<li><a href=\"Login.aspx\">Sign in</a></li>");
+                                    Response.Write("<li><a href=\"Register.aspx\">Sign Up</a></li>");
+                                    Response.Write("<li><a class=\"user\">Hello Guest, there are currently " + Application["usercount"] + " users online.</a></li>");
+
+                                }
+
+            %>
+        </ul>
+    </nav>
+    <script>
+        for (var i = 0; i < document.links.length; i++) {
+            if (document.links[i].href == document.URL) {
+                document.links[i].className = 'active';
+            }
+        }
+
+    </script>
+
+            <asp:ContentPlaceHolder ID="ContentPlaceHolder1" runat="server">
+            </asp:ContentPlaceHolder>
+
+</body>
+</html>
