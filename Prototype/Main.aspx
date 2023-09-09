@@ -14,7 +14,7 @@
     <div id="canvas" style="height:100%; padding:0%;margin-top:0%;">
 		<script src="js/three.js"></script>
 		<script type ="module" src ="js/GLTFLoader.js"></script>
-        <script type="text/javascript" src="dat.gui.min.js"></script>
+        <script type="text/javascript" src="js/dat.gui.min.js"></script>
         <script type="module" src="js/dat.gui.module.js"></script>
 
 		<script type ="module">

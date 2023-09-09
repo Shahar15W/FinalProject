@@ -1,0 +1,71 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title></title>
+</head>
+<body>
+    <div>
+        <input type="text" id="name" placeholder="Your Name" />
+        <input type="text" id="message" placeholder="Message" />
+        <input type="button" id="sendButton" value="Send" />
+    </div>
+    <div id="chat"></div>
+</body>
+</html>
+<script src="Scripts/jquery-3.7.1.min.js"></script>
+<script src="Scripts/jquery.signalR-2.4.3.min.js"></script>
+<script src="http://localhost:8081/hubs"></script>
+<script>
+    $(function () {
+        // Initialize SignalR connection
+        var connection = $.hubConnection(); // Create a SignalR connection
+        var lobbyHub = connection.createHubProxy('LobbyHub'); // Create a proxy to your hub
+        connection.url = 'http://localhost:8081/Hubs'; // Replace with your hub URL
+
+        // Handle connection error
+        connection.error(function (error) {
+            console.error('SignalR connection error:', error); // Log the error in the console
+            // Display an alert to the user
+            alert('Unable to connect to the server. Please try again later.'); // Display an alert
+        });
+
+        lobbyHub.on('PlayerJoined', function (playerName) {
+            // Handle player joined event
+            console.log(playerName + ' joined the lobby.');
+        });
+
+        lobbyHub.on('PlayerLeft', function (playerName) {
+            // Handle player left event
+            console.log(playerName + ' left the lobby.');
+        });
+
+        lobbyHub.on('LobbyCreated', function (lobbyId) {
+            // Handle player left event
+            console.log(lobbyId + ' created');
+        });
+
+        // Define other event handlers as needed
+
+        // Start the SignalR connection
+        connection.start().done(function () {
+            // Connection successful
+            console.log('SignalR connection established.');
+        }).fail(function (error) {
+            // Connection failed
+            console.error('SignalR connection error: ' + error);
+        });
+
+        connection.disconnected(function () {
+            console.log('SignalR connection disconnected.');
+        });
+        const myTimeout = setTimeout(x => test(), 5000);
+
+        function test() {
+            lobbyHub.invoke('JoinLobby', 'lobby123', 'PlayerName')
+            lobbyHub.invoke('CreateLobby', 'lobby123', 'Chess');
+            lobbyHub.invoke('JoinLobby', 'lobby123', 'PlayerName');
+            lobbyHub.invoke("GetLobbies");
+        }
+    });
+</script>
