@@ -5,8 +5,10 @@
 <asp:Content ID="Content2" ContentPlaceHolderID="ContentPlaceHolder1" runat="server">
 <div style="padding:20px;margin-top:30px;height:100%;">
     <form class="form-container" method="post" id="form2" runat="server" >
-
+        <div><h1>List of Lobbies: </h1><br /></div>
         <%=data %>
+
+        <%=create %>
     </form>
 </div>
 </asp:Content>

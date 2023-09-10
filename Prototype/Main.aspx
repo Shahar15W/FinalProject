@@ -1,4 +1,4 @@
-﻿<%@ Page Language="C#" MasterPageFile="~/SiteMaster.Master" AutoEventWireup="true" CodeBehind="Main.aspx.cs" Inherits="Prototype.Main" %>
+﻿<%@ Page Language="C#" MasterPageFile="~/SiteMaster.Master" AutoEventWireup="true" Async="true" CodeBehind="Main.aspx.cs" Inherits="Prototype.Main" %>
 
 <asp:Content ID="Content1" ContentPlaceHolderID="head" runat="server">
 		<meta charset="utf-8">
@@ -6,7 +6,12 @@
 		<title>GameBoard</title>
 		<style>
 			body { margin: 0; overflow-y: hidden; overflow-x: hidden}
-			canvas {width : 100%; height: 100%; padding:0px;margin-top:1px
+		    canvas {
+		        width: 100%;
+		        height: 100%;
+		        padding: 0px;
+		        margin-top: 1px
+		    }
 		</style>
 
 </asp:Content>
@@ -16,6 +21,10 @@
 		<script type ="module" src ="js/GLTFLoader.js"></script>
         <script type="text/javascript" src="js/dat.gui.min.js"></script>
         <script type="module" src="js/dat.gui.module.js"></script>
+
+        <script src="Scripts/jquery-3.7.1.min.js"></script>
+        <script src="Scripts/jquery.signalR-2.4.3.min.js"></script>
+        <script src="http://localhost:8081/hubs"></script>
 
 		<script type ="module">
             import { GLTFLoader } from "./js/GLTFLoader.js";
@@ -27,6 +36,25 @@
             var json = (<%= json %>);
 
             var game = "<%= game %>";
+
+            var lobby = "<%= lobby %>";
+
+            
+
+            var posdict = {};
+
+            <%foreach(var p in pos)
+            { %>
+            posdict["<%=p.Key%>"] = "<%=p.Value%>".replace("(", "").replace(")", "").replace(",","");
+          <%  }%>
+
+            var playername = Math.floor(Math.random() * 100);
+
+            var dict = {};
+
+
+            
+
 
 			const scene = new THREE.Scene();
             scene.background = new THREE.CubeTextureLoader()
@@ -45,6 +73,104 @@
             var ground = [];
 
             const gui = new dat.GUI()
+
+
+            //adds already logged in players
+            for (var player in posdict) {
+                console.log(player + ' is in the lobby.');
+
+                var playerpos = posdict[player];
+                var [x, y, z] = playerpos.split(" ");
+
+                y = y.split(",")[0];
+
+                const geometry = new THREE.BoxGeometry(5, 5, 5);
+                console.log("made gemoetry for player " + player)
+                const material = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
+                console.log("made material for player " + player)
+                const cube = new THREE.Mesh(geometry, material);
+                console.log("made cube for player " + player)
+                scene.add(cube);
+
+                dict[player] = cube;
+                dict[player].position.set(x, y, z);
+                console.log("added cube as " + player + " at " + x + ", " + y + ", " + z)
+            }
+
+            // Initialize SignalR connection
+            var connection = $.hubConnection(); // Create a SignalR connection
+            var lobbyHub = connection.createHubProxy('LobbyHub'); // Create a proxy to your hub
+            connection.url = 'http://localhost:8081/Hubs'; // Replace with your hub URL
+
+
+            //signalr logic
+            $(function () {
+
+
+                // Handle connection error
+                connection.error(function (error) {
+                    console.error('SignalR connection error:', error); // Log the error in the console
+                    // Display an alert to the user
+                    alert('Unable to connect to the server. Please try again later.'); // Display an alert
+                });
+
+                lobbyHub.on('PlayerJoined', function (playerName) {
+                    // Handle player joined event
+                    console.log(dict);
+                    if (!(playerName in dict)) {
+                        console.log(playerName + ' joined the lobby.');
+
+                        const geometry = new THREE.BoxGeometry(5, 5, 5);
+                        console.log("made gemoetry for player " + playerName)
+                        const material = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
+                        console.log("made material for player " + playerName)
+                        const cube = new THREE.Mesh(geometry, material);
+                        console.log("made cube for player " + playerName)
+                        scene.add(cube);
+
+                        dict[playerName] = cube;
+                        console.log("added cube as " + playerName)
+                    }
+                    else {
+                        console.log("Player" + playerName + " already in the lobby.")
+                    }
+
+                });
+
+                lobbyHub.on('PlayerLeft', function (playerName) {
+                    // Handle player left event
+                    console.log(playerName + ' left the lobby.');
+                    scene.remove(dict[playerName]);
+                    delete dict[playerName];
+                });
+
+                lobbyHub.on('LobbyCreated', function (lobbyId) {
+                    // Handle player left event
+                    console.log(lobbyId + ' created');
+                });
+
+                lobbyHub.on('PlayerMoved', function (player, x, y, z) {
+                    console.log("Recieved from server", player, x, y, z);
+                    dict[player].position.set(x, y, z);
+                });
+
+                // Define other event handlers as needed
+
+                // Start the SignalR connection
+                connection.start().done(function () {
+                    // Connection successful
+                    console.log('SignalR connection established.');
+                    lobbyHub.invoke('JoinLobby', lobby, playername);
+                }).fail(function (error) {
+                    // Connection failed
+                    console.error('SignalR connection error: ' + error);
+                });
+
+                connection.disconnected(function () {
+                    console.log('SignalR connection disconnected.');
+                });
+
+            });
 
 
             const Texture = new THREE.TextureLoader().load("./Creations/" + game + "/" + json["Board"]["Texture"]);
@@ -354,9 +480,24 @@
             
 
 
+            var lastvector = new Vector3(0, 0, 0);
+
             function animate() {
                 requestAnimationFrame(animate);
 
+
+                var currentvector = camera.position.clone()
+
+
+
+                if (Math.abs(currentvector.x - lastvector.x) > 0.1 ||
+                    Math.abs(currentvector.y - lastvector.y) > 0.1 ||
+                    Math.abs(currentvector.z - lastvector.z) > 0.1
+                ) {
+                    lobbyHub.invoke('MovePlayer', playername, currentvector.x, currentvector.y, currentvector.z);
+                    lastvector = currentvector;
+                    console.log("Sent to the server " + lastvector.x + ", " + lastvector.y + ", " + lastvector.z);
+                }
 
                 controls.update(); // only required if controls.enableDamping = true, or if controls.autoRotate = true
                 if (select != null) {
@@ -484,6 +625,7 @@
             }
 
 			//Our Javascript will go here.
+
         </script>
         </div>
 </asp:Content>
