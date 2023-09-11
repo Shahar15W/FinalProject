@@ -39,18 +39,30 @@
 
             var lobby = "<%= lobby %>";
 
-            
 
             var posdict = {};
+
+            var cursorsin = 0;
+            var cursoroffset = 1
 
             <%foreach(var p in pos)
             { %>
             posdict["<%=p.Key%>"] = "<%=p.Value%>".replace("(", "").replace(")", "").replace(",","");
           <%  }%>
 
-            var playername = Math.floor(Math.random() * 100);
+            var playername = "<%=username %>"
 
             var dict = {};
+
+
+            var cursordict = {};
+
+            <%foreach(var c in cursors)
+            { %>
+            cursordict["<%=c.Key%>"] = "<%=c.Value%>".replace("(", "").replace(")", "").replace(",", "");
+          <%  }%>
+
+            var cursors = {};
 
 
             
@@ -69,33 +81,108 @@
                 ]);
             scene.fog = new THREE.FogExp2(0xcccccc, 0.002);
 
+            window.addEventListener("resize", () => {
+                console.log("resize");
+                renderer.setSize(window.innerWidth, window.innerHeight);
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+            });
+
+            const renderer = new THREE.WebGLRenderer();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            renderer.shadowCameraNear = 3;
+            renderer.toneMapping = THREE.CineonToneMapping;
+            renderer.toneMappingExposure = 2.5;
+
             const pointer = new THREE.Vector2();
             var ground = [];
 
             const gui = new dat.GUI()
 
+            var cameraObj = null;
+
+            var loader = new GLTFLoader();
+
+
+
+            loader.load("./Models/camera.glb", function (gltf) {
+                cameraObj = gltf.scene;
+                gltf.userData.isContainer = true;
+
+                cameraObj.traverse((child) => {
+                    if (child.isMesh) {
+                        child.material.transparent = true;
+                        child.castShadow = true;
+                        child.receiveShadow = true;
+                        child.material.metalness = 0;
+                        if (child.material.map)
+                            child.material.map.anisotropy = 16;
+                    }
+                })
+            });
+
+            var cursorObj = null;
+
+            loader.load("./Models/cursor.glb", function (gltf) {
+                cursorObj = gltf.scene;
+                gltf.userData.isContainer = true;
+
+                cursorObj.traverse((child) => {
+                    if (child.isMesh) {
+                        child.material.transparent = true;
+                        child.castShadow = true;
+                        child.receiveShadow = true;
+                        child.material.metalness = 0;
+                        if (child.material.map)
+                            child.material.map.anisotropy = 16;
+                    }
+                })
+            });
 
             //adds already logged in players
-            for (var player in posdict) {
-                console.log(player + ' is in the lobby.');
 
-                var playerpos = posdict[player];
-                var [x, y, z] = playerpos.split(" ");
+            const timeout = setTimeout(function (x) { 
+                for (var player in posdict) {
+                    console.log(player + ' is in the lobby.');
 
-                y = y.split(",")[0];
 
-                const geometry = new THREE.BoxGeometry(5, 5, 5);
-                console.log("made gemoetry for player " + player)
-                const material = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
-                console.log("made material for player " + player)
-                const cube = new THREE.Mesh(geometry, material);
-                console.log("made cube for player " + player)
-                scene.add(cube);
+                    var playerpos = posdict[player];
+                    var [x, y, z, rx, ry, rz] = playerpos.split(" ");
 
-                dict[player] = cube;
-                dict[player].position.set(x, y, z);
-                console.log("added cube as " + player + " at " + x + ", " + y + ", " + z)
-            }
+                    y = y.split(",")[0];
+                    z = z.split(",")[0];
+                    rx = rx.split(",")[0];
+                    ry = ry.split(",")[0];
+                    rz = rz.split(",")[0];
+
+                    const playercam = cameraObj.clone();
+
+                    scene.add(playercam);
+
+                    dict[player] = playercam;
+                    dict[player].position.set(x, y, z);
+                    dict[player].rotation.set(rx, ry, rz);
+                    console.log("added camera as " + player + " at " + x + ", " + y + ", " + z)
+                }
+
+                for (var cursor in cursordict) {
+                    var cursorpos = cursordict[cursor];
+                    var [x, y, z] = cursorpos.split(" ");
+                    y = y.split(",")[0];
+                    z = z.split(",")[0];
+
+                    var playercursor = cursorObj.clone();
+                    scene.add(playercursor);
+
+                    cursors[cursor] = playercursor;
+                    cursors[cursor].position.set(x, y + cursoroffset, z);
+                    cursors[cursor].scale.set(0.03, 0.03, 0.03);
+                    console.log("added cursor as " + cursor + " at " + x + ", " + y + ", " + z)
+                }
+            }, 100);
 
             // Initialize SignalR connection
             var connection = $.hubConnection(); // Create a SignalR connection
@@ -116,20 +203,20 @@
 
                 lobbyHub.on('PlayerJoined', function (playerName) {
                     // Handle player joined event
-                    console.log(dict);
                     if (!(playerName in dict)) {
                         console.log(playerName + ' joined the lobby.');
 
-                        const geometry = new THREE.BoxGeometry(5, 5, 5);
-                        console.log("made gemoetry for player " + playerName)
-                        const material = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
-                        console.log("made material for player " + playerName)
-                        const cube = new THREE.Mesh(geometry, material);
-                        console.log("made cube for player " + playerName)
-                        scene.add(cube);
+                        const playercam = cameraObj.clone();
+                        var playercursor = cursorObj.clone();
 
-                        dict[playerName] = cube;
-                        console.log("added cube as " + playerName)
+                        scene.add(playercam);
+                        scene.add(playercursor)
+
+                        dict[playerName] = playercam;
+                        cursors[playerName] = playercursor;
+                        cursors[playerName].scale.set(0.03, 0.03, 0.03);
+
+                        console.log("added camera and cursor as " + playerName)
                     }
                     else {
                         console.log("Player" + playerName + " already in the lobby.")
@@ -141,7 +228,10 @@
                     // Handle player left event
                     console.log(playerName + ' left the lobby.');
                     scene.remove(dict[playerName]);
+                    scene.remove(cursors[playerName]);
+
                     delete dict[playerName];
+                    delete cursors[playerName];
                 });
 
                 lobbyHub.on('LobbyCreated', function (lobbyId) {
@@ -149,9 +239,14 @@
                     console.log(lobbyId + ' created');
                 });
 
-                lobbyHub.on('PlayerMoved', function (player, x, y, z) {
-                    console.log("Recieved from server", player, x, y, z);
+                lobbyHub.on('PlayerMoved', function (player, x, y, z, rx, ry, rz) {
                     dict[player].position.set(x, y, z);
+                    dict[player].rotation.set(rx, ry, rz);
+                });
+
+                lobbyHub.on('CursorMoved', function (player, x, y, z) {
+                    cursors[player].position.set(x, y + cursoroffset, z);
+
                 });
 
                 // Define other event handlers as needed
@@ -230,24 +325,13 @@
 
             const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
 
-
-
-
-            const renderer = new THREE.WebGLRenderer();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            renderer.setPixelRatio(window.devicePixelRatio);
-            renderer.shadowMap.enabled = true;
-            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
             render.shadowCameraFar = camera.far;
-            renderer.shadowCameraNear = 3;
-            renderer.toneMapping = THREE.CineonToneMapping;
-            renderer.toneMappingExposure = 2.5;
+
 
             document.body.appendChild(renderer.domElement);
             renderer.physicallyCorrectLights = true;
 
 
-			var loader = new GLTFLoader();
             var obj;
 
 			loader.load("./Models/wooden_table.glb", function (gltf) {
@@ -268,7 +352,6 @@
                             child.material.map.anisotropy = 16;
                     }
                 })
-                const cubeFolder = gui.addFolder('Table');
                 ground.push(obj);
             });
 
@@ -477,32 +560,61 @@
             var raycaster = new THREE.Raycaster();
             var intersects;
 
-            
 
+            var lastcursorvector = new THREE.Vector3(0, 0, 0);
 
-            var lastvector = new Vector3(0, 0, 0);
+            var lastcameravector = new THREE.Vector3(0, 0, 0);
+            var cameralookatlast = new THREE.Vector3();
+            var cameralookatcurrent = new THREE.Vector3();
+            var currentvector = new THREE.Vector3();
+
+            var lastoffset = 0
 
             function animate() {
                 requestAnimationFrame(animate);
 
+                controls.update(); // only required if controls.enableDamping = true, or if controls.autoRotate = true
 
-                var currentvector = camera.position.clone()
-
-
-
-                if (Math.abs(currentvector.x - lastvector.x) > 0.1 ||
-                    Math.abs(currentvector.y - lastvector.y) > 0.1 ||
-                    Math.abs(currentvector.z - lastvector.z) > 0.1
-                ) {
-                    lobbyHub.invoke('MovePlayer', playername, currentvector.x, currentvector.y, currentvector.z);
-                    lastvector = currentvector;
-                    console.log("Sent to the server " + lastvector.x + ", " + lastvector.y + ", " + lastvector.z);
+                for (var cursor in cursors) {
+                    var c = cursors[cursor];
+                    c.rotation.set(c.rotation.x, Math.atan2((camera.position.x - c.position.x), (camera.position.z - c.position.z)), c.rotation.z);
+                    c.position.set(c.position.x, c.position.y + cursoroffset - lastoffset, c.position.z);
+                    lastoffset = cursoroffset;
+                    cursoroffset += Math.sin(cursorsin / 30) * 0.02;
+                    cursorsin += 1;
                 }
 
-                controls.update(); // only required if controls.enableDamping = true, or if controls.autoRotate = true
+                raycaster.setFromCamera(pointer, camera);
+                intersects = raycaster.intersectObjects(ground, true);
+
+                currentvector = camera.position.clone()
+
+                cameralookatcurrent = camera.rotation.clone()
+
+                if (Math.abs(currentvector.x - lastcameravector.x) > 0.3 ||
+                    Math.abs(currentvector.y - lastcameravector.y) > 0.3 ||
+                    Math.abs(currentvector.z - lastcameravector.z) > 0.3 ||
+                    Math.abs(cameralookatcurrent.x - cameralookatlast.x) > 0.03 ||
+                    Math.abs(cameralookatcurrent.y - cameralookatlast.y) > 0.03 ||
+                    Math.abs(cameralookatcurrent.z - cameralookatlast.z) > 0.03
+                ) {
+                    lobbyHub.invoke('MovePlayer', playername, currentvector.x, currentvector.y, currentvector.z, cameralookatcurrent.x, cameralookatcurrent.y, cameralookatcurrent.z);
+                    lastcameravector = currentvector;
+                    cameralookatlast = cameralookatcurrent;
+                }
+
+                if (intersects.length > 0) {
+                    if (Math.abs(intersects[0].point.x - lastcursorvector.x) > 0.03 ||
+                        Math.abs(intersects[0].point.y - lastcursorvector.y) > 0.03 ||
+                        Math.abs(intersects[0].point.z - lastcursorvector.z) > 0.03) {
+                        
+                        lobbyHub.invoke('MoveCursor', playername, intersects[0].point.x, intersects[0].point.y, intersects[0].point.z);
+                        lastcursorvector = intersects[0].point;
+                    }
+                }
+
                 if (select != null) {
-                    raycaster.setFromCamera(pointer, camera);
-                    intersects = raycaster.intersectObjects(ground, true);
+                    
                     if (intersects.length > 0) {
                         select.position.x = (intersects[0].point.x);
                         select.position.y = (intersects[0].point.y);
@@ -530,12 +642,8 @@
             
             animate();
             var select = null;
-            window.addEventListener("resize", () => {
-                console.log("resize");
-                renderer.setSize(window.innerWidth, window.innerHeight);
-                camera.aspect = window.innerWidth / window.innerHeight;
-                camera.updateProjectionMatrix();
-            });
+
+
             function onDocumentMouseDown(event) {
                 event.preventDefault();
 
@@ -606,9 +714,10 @@
             }
             function VectorRad(vector) {
                 var res = new THREE.Vector3(0, 0, 0);
-                res.x = vector.x * Math.PI/ 180;
+                res.x = vector.x * Math.PI / 180;
                 res.y = vector.y * Math.PI / 180;
                 res.z = vector.z * Math.PI / 180;
+
                 return res;
             }
 

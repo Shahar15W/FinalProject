@@ -19,13 +19,19 @@ namespace Prototype
         protected string lobby;
         protected string game = "";
         protected string type;
-        protected Dictionary<string, Tuple<double, double, double>> pos;
-        protected Dictionary<string, Tuple<double, double, double>> dics;
+        protected Dictionary<string, Tuple<double, double, double, double, double, double>> pos;
+        protected Dictionary<string, Tuple<double, double, double, double, double, double>> dics;
+        protected Dictionary<string, Tuple<double, double, double>> cursors;
+        protected Dictionary<string, Tuple<double, double, double>> cursorsdict;
+        protected string username = null;
+
         protected void Page_Load(object sender, EventArgs e)
         {
 
-
+            Random rnd = new Random();
+            username = (string)Session["username"] ?? "Guest-" + rnd.Next();
             
+
             lobby = Request.QueryString["game"];
 
 
@@ -52,11 +58,19 @@ namespace Prototype
 
             });
 
-            lobbyHub.On<Dictionary<string, Tuple<double, double, double>>>("PlayersPos", result =>
+            lobbyHub.On<Dictionary<string, Tuple<double, double, double, double, double, double>>>("PlayersPos", result =>
             {
                 // 'lobbies' is the list of lobbies received from the server
                 // Handle the list of players as needed
                 dics = result;
+
+            });
+
+            lobbyHub.On<Dictionary<string, Tuple<double, double, double>>>("CursorsPos", result =>
+            {
+                // 'lobbies' is the list of lobbies received from the server
+                // Handle the list of players as needed
+                cursorsdict = result;
 
             });
 
@@ -94,6 +108,16 @@ namespace Prototype
 
             return;
         }
+
+        public async Task GetCursors(string lobby, IHubProxy lobbyHub)
+        {
+
+            await lobbyHub.Invoke("GetCursors", lobby);
+
+            cursors = cursorsdict;
+
+            return;
+        }
         public async void Methods(string lobby, IHubProxy lobbyHub, HubConnection connection)
         {
             await LoadJson(lobby, lobbyHub);
@@ -101,6 +125,8 @@ namespace Prototype
             await GetType(lobby, lobbyHub);
 
             await GetPlayerPos(lobby, lobbyHub);
+
+            await GetCursors(lobby, lobbyHub);
 
             connection.Dispose();
 
